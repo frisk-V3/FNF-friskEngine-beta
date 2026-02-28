@@ -4,44 +4,19 @@
 <meta charset="UTF-8">
 <title>FNF TXT Engine</title>
 <style>
-body {
-  margin: 0;
-  background: #111;
-  color: #fff;
-  font-family: sans-serif;
-}
-#game {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  position: relative;
-}
-.note {
-  width: 80px;
-  height: 20px;
-  position: absolute;
-  background: #4af;
-  border-radius: 4px;
-}
-.lane0 { left: 10vw; }
-.lane1 { left: 30vw; }
-.lane2 { left: 50vw; }
-.lane3 { left: 70vw; }
-#loader {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 24px;
-}
+body { margin:0; background:#111; color:#fff; font-family:sans-serif; }
+#game { width:100vw; height:100vh; position:relative; overflow:hidden; }
+.note { width:80px; height:20px; position:absolute; background:#4af; border-radius:4px; }
+.lane0 { left:10vw; } .lane1 { left:30vw; } .lane2 { left:50vw; } .lane3 { left:70vw; }
+#loader { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:24px; }
 </style>
 </head>
 <body>
-<div id="game">
-  <div id="loader">Loading TXT…</div>
-</div>
+<div id="game"><div id="loader">Loading…</div></div>
+
 <script>
-async function loadTXT(url){
-  const res = await fetch(url);
+async function loadTXT(path){
+  const res = await fetch(path);
   return await res.text();
 }
 
@@ -56,26 +31,18 @@ function parseChart(txt){
   for(const line of lines){
     if(line.startsWith("BPM:")) bpm = parseFloat(line.split(":")[1]);
     else if(line.startsWith("OFFSET:")) offset = parseFloat(line.split(":")[1]);
-    else if(line.match(/^\d/)){
+    else if(line.match(/^[0-9]/)){
       const [time, lane, type, length] = line.split(" ");
-      chart.push({
-        time: parseFloat(time),
-        lane: parseInt(lane),
-        type,
-        length: parseFloat(length)
-      });
+      chart.push({ time:parseFloat(time), lane:parseInt(lane), type, length:parseFloat(length) });
     }
   }
 }
+
 async function parseAssets(txt){
   const lines = txt.split("\n");
   for(const line of lines){
-    if(line.startsWith("AUDIO:")){
-      audioData = line.replace("AUDIO:","").trim();
-    }
-    if(line.startsWith("IMAGE:")){
-      bgData = line.replace("IMAGE:","").trim();
-    }
+    if(line.startsWith("AUDIO:")) audioData = line.replace("AUDIO:","").trim();
+    if(line.startsWith("IMAGE:")) bgData = line.replace("IMAGE:","").trim();
   }
 }
 
@@ -91,6 +58,15 @@ function setBackground(base64){
   game.style.backgroundSize = "cover";
   game.style.backgroundPosition = "center";
 }
+
+function parseMeta(txt){
+  const lines = txt.split("\n");
+  for(const line of lines){
+    if(line.startsWith("TITLE:"))
+      document.title = line.replace("TITLE:","").trim();
+  }
+}
+
 let audio = null;
 let startTime = 0;
 let playing = false;
@@ -108,7 +84,6 @@ function spawnNotes(){
 function startGame(){
   audio = createAudio(audioData);
   setBackground(bgData);
-
   spawnNotes();
 
   audio.oncanplay = () => {
@@ -121,39 +96,44 @@ function startGame(){
 
 function gameLoop(now){
   if(!playing) return;
-
   const t = now - startTime;
 
   const notes = document.querySelectorAll(".note");
   for(const note of notes){
     const noteTime = parseFloat(note.dataset.time);
     const diff = noteTime - t;
-
-    // 落下位置（適当に調整）
     const y = diff * 0.3 + 400;
     note.style.top = y + "px";
-
-    // 画面外に出たら削除
-    if(y > window.innerHeight){
-      note.remove();
-    }
+    if(y > window.innerHeight) note.remove();
   }
 
   requestAnimationFrame(gameLoop);
 }
-async function main(){
-  const chartTXT = await loadTXT("chart.txt");
-  const audioTXT = await loadTXT("audio.txt");
-  const bgTXT    = await loadTXT("bg.txt");
+
+async function loadMod(modName){
+  const base = `mods/${modName}/`;
+
+  const chartTXT = await loadTXT(base + "chart.txt");
+  const audioTXT = await loadTXT(base + "audio.txt");
+  const bgTXT    = await loadTXT(base + "bg.txt");
+  const metaTXT  = await loadTXT(base + "meta.txt").catch(()=> "");
 
   parseChart(chartTXT);
   await parseAssets(audioTXT + "\n" + bgTXT);
+  parseMeta(metaTXT);
 
   document.getElementById("loader").innerText = "Ready!";
   setTimeout(startGame, 500);
 }
 
-main();
+const params = new URLSearchParams(location.search);
+const mod = params.get("mod");
+
+if(mod){
+  loadMod(mod);
+}else{
+  document.body.innerHTML = "<h1 style='color:white;text-align:center;margin-top:40vh;'>mod が指定されていません</h1>";
+}
 </script>
 </body>
 </html>
