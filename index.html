@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>FNF TXT Engine</title>
+<style>
+body {
+  margin: 0;
+  background: #111;
+  color: #fff;
+  font-family: sans-serif;
+}
+#game {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+.note {
+  width: 80px;
+  height: 20px;
+  position: absolute;
+  background: #4af;
+  border-radius: 4px;
+}
+.lane0 { left: 10vw; }
+.lane1 { left: 30vw; }
+.lane2 { left: 50vw; }
+.lane3 { left: 70vw; }
+#loader {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="loader">Loading TXT…</div>
+</div>
+<script>
+async function loadTXT(url){
+  const res = await fetch(url);
+  return await res.text();
+}
+
+let chart = [];
+let audioData = null;
+let bgData = null;
+let bpm = 120;
+let offset = 0;
+
+function parseChart(txt){
+  const lines = txt.split("\n");
+  for(const line of lines){
+    if(line.startsWith("BPM:")) bpm = parseFloat(line.split(":")[1]);
+    else if(line.startsWith("OFFSET:")) offset = parseFloat(line.split(":")[1]);
+    else if(line.match(/^\d/)){
+      const [time, lane, type, length] = line.split(" ");
+      chart.push({
+        time: parseFloat(time),
+        lane: parseInt(lane),
+        type,
+        length: parseFloat(length)
+      });
+    }
+  }
+}
+async function parseAssets(txt){
+  const lines = txt.split("\n");
+  for(const line of lines){
+    if(line.startsWith("AUDIO:")){
+      audioData = line.replace("AUDIO:","").trim();
+    }
+    if(line.startsWith("IMAGE:")){
+      bgData = line.replace("IMAGE:","").trim();
+    }
+  }
+}
+
+function createAudio(base64){
+  const audio = new Audio(base64);
+  audio.preload = "auto";
+  return audio;
+}
+
+function setBackground(base64){
+  const game = document.getElementById("game");
+  game.style.backgroundImage = `url(${base64})`;
+  game.style.backgroundSize = "cover";
+  game.style.backgroundPosition = "center";
+}
+let audio = null;
+let startTime = 0;
+let playing = false;
+
+function spawnNotes(){
+  const game = document.getElementById("game");
+  for(const n of chart){
+    const div = document.createElement("div");
+    div.className = `note lane${n.lane}`;
+    div.dataset.time = n.time;
+    game.appendChild(div);
+  }
+}
+
+function startGame(){
+  audio = createAudio(audioData);
+  setBackground(bgData);
+
+  spawnNotes();
+
+  audio.oncanplay = () => {
+    startTime = performance.now() + offset;
+    audio.play();
+    playing = true;
+    requestAnimationFrame(gameLoop);
+  };
+}
+
+function gameLoop(now){
+  if(!playing) return;
+
+  const t = now - startTime;
+
+  const notes = document.querySelectorAll(".note");
+  for(const note of notes){
+    const noteTime = parseFloat(note.dataset.time);
+    const diff = noteTime - t;
+
+    // 落下位置（適当に調整）
+    const y = diff * 0.3 + 400;
+    note.style.top = y + "px";
+
+    // 画面外に出たら削除
+    if(y > window.innerHeight){
+      note.remove();
+    }
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+async function main(){
+  const chartTXT = await loadTXT("chart.txt");
+  const audioTXT = await loadTXT("audio.txt");
+  const bgTXT    = await loadTXT("bg.txt");
+
+  parseChart(chartTXT);
+  await parseAssets(audioTXT + "\n" + bgTXT);
+
+  document.getElementById("loader").innerText = "Ready!";
+  setTimeout(startGame, 500);
+}
+
+main();
+</script>
+</body>
+</html>
