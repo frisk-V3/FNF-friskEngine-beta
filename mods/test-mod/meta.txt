@@ -1,5 +1,5 @@
 TITLE: Test Mod
-ARTIST: Unknown
+ARTIST: frisk
 CHARTER: frisk
 DIFFICULTY: Hard
 DIFFICULTIES: Easy, Normal, Hard
@@ -10,6 +10,6 @@ OFFSET: 0
 THUMB: thumb.png
 
 DESCRIPTION_START
-This is a sample mod for the FNF TXT Engine.
-Made by frisk.
+A sample mod for the FNF TXT Engine.
+Created by frisk.
 DESCRIPTION_END
